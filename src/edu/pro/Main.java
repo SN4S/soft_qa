@@ -23,9 +23,18 @@ public class Main {
     }
 
     private static String loadAndCleanText(String filePath) throws IOException {
-        return new String(Files.readAllBytes(Paths.get(filePath)))
-                .replaceAll("[^A-Za-z ]", " ")
-                .toLowerCase(Locale.ROOT);
+        String raw = new String(Files.readAllBytes(Paths.get(filePath)));
+        StringBuilder sb = new StringBuilder(raw.length());
+
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == ' ') {
+                sb.append(Character.toLowerCase(c));
+            } else {
+                sb.append(' ');
+            }
+        }
+        return sb.toString();
     }
 
     /**
@@ -86,10 +95,6 @@ public class Main {
 
         // HashMap замість двох масивів - економія пам'яті
         Map<String, Integer> frequencies = calculateFrequencies(words);
-
-        // Очищаємо масив words
-        words = null;
-        System.gc();
 
         // PriorityQueue для топ-N замість сортування всього
         List<WordFrequency> topWords = getTopWords(frequencies, TOP_WORDS_COUNT);
