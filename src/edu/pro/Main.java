@@ -5,9 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Locale;
+import java.util.*;
 
 public class Main {
 
@@ -22,108 +20,81 @@ public class Main {
             this.word = word;
             this.frequency = frequency;
         }
-
-        @Override
-        public String toString() {
-            return word + " " + frequency;
-        }
     }
 
-    /**
-     * Читає та очищає текст з файлу
-     */
     private static String loadAndCleanText(String filePath) throws IOException {
-        String content = new String(Files.readAllBytes(Paths.get(filePath)));
-        return content.replaceAll("[^A-Za-z ]", " ").toLowerCase(Locale.ROOT);
+        return new String(Files.readAllBytes(Paths.get(filePath)))
+                .replaceAll("[^A-Za-z ]", " ")
+                .toLowerCase(Locale.ROOT);
     }
 
     /**
-     * Розбиває текст на слова
+     * Рахує частоти слів через Map
+     * Не зберігаємо окремі масиви distincts[] і freq[]
      */
-    private static String[] tokenize(String text) {
-        return text.split(" +");
-    }
+    private static Map<String, Integer> calculateFrequencies(String[] words) {
+        Map<String, Integer> frequencyMap = new HashMap<>();
 
-    /**
-     * Витягує унікальні слова з відсортованого масиву
-     */
-    private static String[] extractDistinctWords(String[] sortedWords) {
-        String distinctString = " ";
-        for (String word : sortedWords) {
-            if (!distinctString.contains(word)) {
-                distinctString += word + " ";
+        for (String word : words) {
+            if (!word.isEmpty()) {
+                frequencyMap.merge(word, 1, Integer::sum);
             }
         }
-        return distinctString.split(" ");
+
+        return frequencyMap;
     }
 
     /**
-     * Рахує частоту кожного унікального слова
+     * Використовує PriorityQueue для топ-N замість сортування всього масиву
+     * Тримає тільки TOP_WORDS_COUNT елементів
      */
-    private static int[] calculateFrequencies(String[] distinctWords, String[] allWords) {
-        int[] frequencies = new int[distinctWords.length];
+    private static List<WordFrequency> getTopWords(Map<String, Integer> frequencies, int topCount) {
+        PriorityQueue<WordFrequency> minHeap = new PriorityQueue<>(
+                topCount,
+                Comparator.comparingInt(wf -> wf.frequency)
+        );
 
-        for (int i = 0; i < distinctWords.length; i++) {
-            int count = 0;
-            for (String word : allWords) {
-                if (distinctWords[i].equals(word)) {
-                    count++;
-                }
+        for (Map.Entry<String, Integer> entry : frequencies.entrySet()) {
+            WordFrequency wf = new WordFrequency(entry.getKey(), entry.getValue());
+
+            if (minHeap.size() < topCount) {
+                minHeap.offer(wf);
+            } else if (wf.frequency > minHeap.peek().frequency) {
+                minHeap.poll();
+                minHeap.offer(wf);
             }
-            frequencies[i] = count;
         }
 
-        return frequencies;
-    }
-
-    /**
-     * Комбінує слова з їх частотами
-     */
-    private static WordFrequency[] combineWordsWithFrequencies(String[] words, int[] frequencies) {
-        WordFrequency[] result = new WordFrequency[words.length];
-
-        for (int i = 0; i < words.length; i++) {
-            result[i] = new WordFrequency(words[i], frequencies[i]);
-        }
+        List<WordFrequency> result = new ArrayList<>(minHeap);
+        result.sort(Comparator.comparingInt((WordFrequency wf) -> wf.frequency).reversed());
 
         return result;
     }
 
-    /**
-     * Виводить топ N слів за частотою
-     */
-    private static void printTopWords(WordFrequency[] wordFrequencies, int topCount) {
-        Arrays.sort(wordFrequencies, Comparator.comparingInt(wf -> wf.frequency));
-
-        System.out.println("Top " + topCount + " most frequent words:");
-        for (int i = 0; i < topCount && i < wordFrequencies.length; i++) {
-            System.out.println(wordFrequencies[wordFrequencies.length - 1 - i]);
+    private static void printTopWords(List<WordFrequency> topWords) {
+        System.out.println("Top " + topWords.size() + " most frequent words:");
+        for (WordFrequency wf : topWords) {
+            System.out.println(wf.word + " " + wf.frequency);
         }
     }
 
     public static void main(String[] args) throws IOException {
         LocalDateTime start = LocalDateTime.now();
 
-        // 1. Завантажити та очистити текст
         String cleanedText = loadAndCleanText(FILE_PATH);
+        String[] words = cleanedText.split(" +");
 
-        // 2. Токенізувати
-        String[] words = tokenize(cleanedText);
+        // HashMap замість двох масивів - економія пам'яті
+        Map<String, Integer> frequencies = calculateFrequencies(words);
 
-        // 3. Відсортувати для групування
-        Arrays.sort(words);
+        // Очищаємо масив words
+        words = null;
+        System.gc();
 
-        // 4. Знайти унікальні слова
-        String[] distinctWords = extractDistinctWords(words);
+        // PriorityQueue для топ-N замість сортування всього
+        List<WordFrequency> topWords = getTopWords(frequencies, TOP_WORDS_COUNT);
 
-        // 5. Порахувати частоти
-        int[] frequencies = calculateFrequencies(distinctWords, words);
-
-        // 6. Створити об'єкти WordFrequency
-        WordFrequency[] wordFrequencies = combineWordsWithFrequencies(distinctWords, frequencies);
-
-        // 7. Вивести топ слів
-        printTopWords(wordFrequencies, TOP_WORDS_COUNT);
+        printTopWords(topWords);
 
         LocalDateTime finish = LocalDateTime.now();
         System.out.println("------");
